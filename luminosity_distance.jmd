@@ -1,0 +1,62 @@
+---
+title: Luminosity Distance - PHYS417 Project 2
+author: Ryan Cox
+date: `j import Dates; Dates.Date(Dates.now())`
+---
+
+```julia; echo = false
+using Dates
+```
+
+# The Friedmann Equation
+Show it can be written
+Predict behaviour (take limits)
+
+In a universe with both matter and dark energy we need to find \(d_p\) by numerical integration over
+\[ d_p(z) = \frac{c}{H_0} \int_0^z \frac{dz'}{E(z')}\]
+From here on out we'll assume a flat universe, unless stated otherwise.
+```julia
+using Unitful # Unit handling
+using UnitfulAstro # Astronomical units
+using PhysicalConstants.CODATA2018: c_0 # Speed of light from CODATA2018, with units
+using QuadGK # Numerical integration
+using Plots, Latexify, UnitfulLatexify
+using Measurements # Uncertainly handling
+
+# Unitful doesn't export preferunits so we have to reference by package
+Unitful.preferunits(u"Mpc",u"Msun")
+
+# Define our cosmological parameters
+Ω0::Real = 0.3
+Ωk::Real = 0 # flat universe
+ΩΛ::Real = 1 - Ω0
+H0 = 70u"km/s/Mpc"
+
+# This is a one line function definition
+E(z::Real)::Number = sqrt(Ω0*(1+z)^3 + Ωk*(1+z)^2 + ΩΛ)
+
+# Input type must be real and the output must be a length
+# Unitful will determine and check the dimensions of the output
+function dp(z::Real)::Unitful.Length
+    """Calculate proper distance from redshift."""
+    integral, err = quadgk(zz -> 1/E(zz), 0, z, rtol=1e-8)
+    return c_0/H0 .* (integral ± err)
+end
+
+dl(z::Real) = dp(z) * (1+z)
+
+z = 0:10
+# dl.(z) vectorises dl so it acts elementwise on z
+plot(z, upreferred.(dl.(z)), unitformat=latexify, label="\\Omega_0=$(Ω0)",
+    legend=:topleft, xlabel=L"\\mathrm{Redshift}", ylabel="\\mathrm{Luminosity\\ distance}")
+
+# Matter dominated -> no dark energy
+Ω0::Real = 1
+ΩΛ::Real = 1 - Ω0
+plot!(z, dl.(z), label=L"\\Omega_0=$(Ω0)") # plot!() updates last plot
+
+# Dark energy dominated -> no matter
+Ω0::Real = 0
+ΩΛ::Real = 1 - Ω0
+plot!(z, dl.(z), label=L"\\Omega_0=$(Ω0)")
+```
