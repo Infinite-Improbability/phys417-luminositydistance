@@ -84,7 +84,6 @@ d_l \approx \frac{zc}{H_0}(1+z) \approx \frac{zc}{H_0} \mathrm{as}\ z \to 0
 
 ```julia
 using CSV, DataFrames
-using LsqFit
 
 dl_from_m(dm::Number)::Unitful.Length = 10u"pc" * 10^(dm/5)
 
@@ -103,21 +102,29 @@ data.dl = upreferred.(dl_from_m.(data.DM))
 scatter(data.z, data.dl, unitformat=latexify, label="Candles",
     legend=:topleft, xlabel=L"\mathrm{Redshift}", ylabel="\\mathrm{Luminosity\\ distance}",
     markersize=3, markeralpha=0.75, xscale=:log10, yscale=:log10)
-
-# z = redshift array, p = parameter array = [H0]
-# The curve fitting doesn't know how to handle units so we convert
-# to Mpc then strip units
-# This is rather annoying. We'll try to be careful to keep them straight
-# and readd them at the earliest opportunity.
-@. lowz_model(z, p) = ustrip(u"Mpc", z * c_0 / p[1]u"km/s/Mpc")
-
-lowz_data = @view data[data.z .< 0.1, [:z, :dl]] # get z and DM for low redshift
-
-#lowz_fit = curve_fit(lowz_model, lowz_data[:,:z], ustrip.(u"Mpc", lowz_data[:,:dl]), ustrip.(u"km/s/Mpc", [H0])) # last term is starting parameter
 ```
 
+We can perform basic least squares in Julia with remarkable ease. Remarkably it handles uncertaintities.
+However it doesn't like units so we'll have to strip them (carefully!).
 ```julia
-G = lowz_data.z * ustrip(u"km/s", c_0)
+using Statistics: mean, cor
 
-display(1 / (G \ ustrip.(u"Mpc", lowz_data.dl)))
+lowz_data = @view data[data.z .< 0.1, [:z, :dl]] # get z and DM for low redshift
+G = lowz_data.z * ustrip(u"km/s", c_0) # construct kernel. dl = G*(1/H0)
+reciprocal_H0 = G \ ustrip.(u"Mpc", lowz_data.dl) # This performs least squares
+lowz_H0 = 1u"km/s/Mpc" / reciprocal_H0
+
+fit_err = abs2.(lowz_data.dl - lowz_data.z*c_0/lowz_H0)
+dl_mean = mean(lowz_data.dl)
+var = abs2.(lowz_data.dl .- dl_mean)
+
+# Let's find coefficent of determination
+print("R^2 = $(1 - sum(fit_err)/sum(var))")
+
+scatter(lowz_data.z, lowz_data.dl, unitformat=latexify, label="Candles",
+    legend=:topleft, xlabel=L"\mathrm{Redshift}", ylabel="\\mathrm{Luminosity\\ distance}",
+    markersize=3, markeralpha=0.75)
+
+z = 0:0.01:0.1
+plot!(z, z*c_0/lowz_H0, linewidth=1, label="Fit")
 ```
