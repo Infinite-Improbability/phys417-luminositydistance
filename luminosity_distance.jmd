@@ -49,8 +49,14 @@ dl(z::Real) = dp(z) * (1+z)
 
 z = 0:0.5:10
 # dl.(z) vectorises dl so it acts elementwise on z
-plot(z, upreferred.(dl.(z)), unitformat=latexify, label="\\Omega_0=$(Ω0)",
-    legend=:topleft, xlabel=L"\mathrm{Redshift}", ylabel="\\mathrm{Luminosity\\ distance}")
+plot(z,
+    upreferred.(dl.(z)),
+    unitformat=latexify,
+    label="\\Omega_0=$(Ω0)",
+    legend=:topleft,
+    xlabel=L"\mathrm{Redshift}",
+    ylabel="\\mathrm{Luminosity\\ distance}"
+)
 
 # Matter dominated -> no dark energy
 Ω0::Real = 1
@@ -99,32 +105,66 @@ select!(data, :id, :z, :DM)  # Get rid of the other columns
 
 data.dl = upreferred.(dl_from_m.(data.DM))
 
-scatter(data.z, data.dl, unitformat=latexify, label="Candles",
-    legend=:topleft, xlabel=L"\mathrm{Redshift}", ylabel="\\mathrm{Luminosity\\ distance}",
-    markersize=3, markeralpha=0.75, xscale=:log10, yscale=:log10)
+scatter(data.z,
+        data.dl,
+        unitformat=latexify,
+        label="Candles",
+        legend=:topleft,
+        xlabel=L"\mathrm{Redshift}",
+        ylabel="\\mathrm{Luminosity\\ distance}",
+        markersize=3,
+        markeralpha=0.75,
+        xscale=:log10,
+        yscale=:log10
+)
 ```
 
 We can perform basic least squares in Julia with remarkable ease. Remarkably it handles uncertaintities.
 However it doesn't like units so we'll have to strip them (carefully!).
 ```julia
-using Statistics: mean, cor
+using Statistics: mean
 
 lowz_data = @view data[data.z .< 0.1, [:z, :dl]] # get z and DM for low redshift
 G = lowz_data.z * ustrip(u"km/s", c_0) # construct kernel. dl = G*(1/H0)
 reciprocal_H0 = G \ ustrip.(u"Mpc", lowz_data.dl) # This performs least squares
 lowz_H0 = 1u"km/s/Mpc" / reciprocal_H0
 
-fit_err = abs2.(lowz_data.dl - lowz_data.z*c_0/lowz_H0)
+println("Estimated H0 = $(lowz_H0)")
+
+# sum of squares error
+fit_err = sum(abs2, Measurements.value.(lowz_data.dl) - lowz_data.z*c_0/Measurements.value(lowz_H0))
 dl_mean = mean(lowz_data.dl)
-var = abs2.(lowz_data.dl .- dl_mean)
+# sum of variance
+var = sum(abs2, Measurements.value.(lowz_data.dl .- Measurements.value.(dl_mean))) 
+println("R^2 = $(1 - fit_err/var)") # Coefficent of determination
 
-# Let's find coefficent of determination
-print("R^2 = $(1 - sum(fit_err)/sum(var))")
+dl_fit_err = sqrt(1/(nrow(lowz_data)-1) * fit_err) # Std of dl from fit error
 
-scatter(lowz_data.z, lowz_data.dl, unitformat=latexify, label="Candles",
-    legend=:topleft, xlabel=L"\mathrm{Redshift}", ylabel="\\mathrm{Luminosity\\ distance}",
-    markersize=3, markeralpha=0.75)
+scatter(lowz_data.z,
+        lowz_data.dl,
+        unitformat=latexify,
+        label="Candles",
+        legend=:topleft,
+        xlabel=L"\mathrm{Redshift}",
+        ylabel="\\mathrm{Luminosity\\ distance}",
+        markersize=3,
+        markeralpha=0.75
+)
 
 z = 0:0.01:0.1
 plot!(z, z*c_0/lowz_H0, linewidth=1, label="Fit")
+
+dlz = z*c_0/Measurements.value(lowz_H0)
+display(dl_fit_err)
+
+plot!(
+    z,
+    dlz .+ dl_fit_err,
+    fillrange = dlz .- dl_fit_err,
+    fillcolor = :lightgray,
+    fillalpha = 0.5,
+    linecolor = nothing,
+    primary = false, # no legend entry
+    z_order = :back
+)
 ```
