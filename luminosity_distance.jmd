@@ -12,15 +12,17 @@ using Dates
 Show it can be written
 Predict behaviour (take limits)
 
-In a universe with both matter and dark energy we need to find \(d_p\) by numerical integration over
-\[ d_p(z) = \frac{c}{H_0} \int_0^z \frac{dz'}{E(z')}\]
+In a universe with both matter and dark energy we need to find ``d_p`` by numerical integration of
+```math
+d_p(z) = \frac{c}{H_0} \int_0^z \frac{dz'}{E(z')}
+```
 From here on out we'll assume a flat universe, unless stated otherwise.
 ```julia
 using Unitful # Unit handling
 using UnitfulAstro # Astronomical units
 using PhysicalConstants.CODATA2018: c_0 # Speed of light from CODATA2018, with units
 using QuadGK # Numerical integration
-using Plots, Latexify, UnitfulLatexify
+using Plots, Latexify, UnitfulLatexify, LaTeXStrings
 using Measurements # Uncertainly handling
 
 # Unitful doesn't export preferunits so we have to reference by package
@@ -30,7 +32,7 @@ Unitful.preferunits(u"Mpc",u"Msun")
 Ω0::Real = 0.3
 Ωk::Real = 0 # flat universe
 ΩΛ::Real = 1 - Ω0
-H0 = 70u"km/s/Mpc"
+H0 = 70.0u"km/s/Mpc"
 
 # This is a one line function definition
 E(z::Real)::Number = sqrt(Ω0*(1+z)^3 + Ωk*(1+z)^2 + ΩΛ)
@@ -45,18 +47,77 @@ end
 
 dl(z::Real) = dp(z) * (1+z)
 
-z = 0:10
+z = 0:0.5:10
 # dl.(z) vectorises dl so it acts elementwise on z
 plot(z, upreferred.(dl.(z)), unitformat=latexify, label="\\Omega_0=$(Ω0)",
-    legend=:topleft, xlabel=L"\\mathrm{Redshift}", ylabel="\\mathrm{Luminosity\\ distance}")
+    legend=:topleft, xlabel=L"\mathrm{Redshift}", ylabel="\\mathrm{Luminosity\\ distance}")
 
 # Matter dominated -> no dark energy
 Ω0::Real = 1
 ΩΛ::Real = 1 - Ω0
-plot!(z, dl.(z), label=L"\\Omega_0=$(Ω0)") # plot!() updates last plot
+plot!(z, dl.(z), label="\\Omega_0=$(Ω0)") # plot!() updates last plot
 
 # Dark energy dominated -> no matter
 Ω0::Real = 0
 ΩΛ::Real = 1 - Ω0
-plot!(z, dl.(z), label=L"\\Omega_0=$(Ω0)")
+plot!(z, dl.(z), label="\\Omega_0=$(Ω0)")
+```
+
+Candle time.
+
+We know that radial velocity is related to proper distance by
+```math
+v_r = H_0 d_p
+```
+In the low redshift (and thus non-relativistic) limit
+```math
+v_r \approx zc
+```
+so we can conclude
+```math
+d_p \approx \frac{zc}{H_0}
+```
+Combining this with our luminosity distance equation and gives
+```math
+d_l \approx \frac{zc}{H_0}(1+z) \approx \frac{zc}{H_0} \mathrm{as}\ z \to 0 
+```
+
+```julia
+using CSV, DataFrames
+using LsqFit
+
+dl_from_m(dm::Number)::Unitful.Length = 10u"pc" * 10^(dm/5)
+
+data = CSV.read("SCPUnion2.1_mu_vs_z.txt",
+                DataFrame,
+                header=["id", "z", "DMVal", "DMErr", "Prob"],
+                skipto=6
+        )
+
+data.DM = data.DMVal .± data.DMErr
+
+select!(data, :id, :z, :DM)  # Get rid of the other columns
+
+data.dl = upreferred.(dl_from_m.(data.DM))
+
+scatter(data.z, data.dl, unitformat=latexify, label="Candles",
+    legend=:topleft, xlabel=L"\mathrm{Redshift}", ylabel="\\mathrm{Luminosity\\ distance}",
+    markersize=3, markeralpha=0.75, xscale=:log10, yscale=:log10)
+
+# z = redshift array, p = parameter array = [H0]
+# The curve fitting doesn't know how to handle units so we convert
+# to Mpc then strip units
+# This is rather annoying. We'll try to be careful to keep them straight
+# and readd them at the earliest opportunity.
+@. lowz_model(z, p) = ustrip(u"Mpc", z * c_0 / p[1]u"km/s/Mpc")
+
+lowz_data = @view data[data.z .< 0.1, [:z, :dl]] # get z and DM for low redshift
+
+#lowz_fit = curve_fit(lowz_model, lowz_data[:,:z], ustrip.(u"Mpc", lowz_data[:,:dl]), ustrip.(u"km/s/Mpc", [H0])) # last term is starting parameter
+```
+
+```julia
+G = lowz_data.z * ustrip(u"km/s", c_0)
+
+display(1 / (G \ ustrip.(u"Mpc", lowz_data.dl)))
 ```
