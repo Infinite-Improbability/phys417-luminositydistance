@@ -24,9 +24,11 @@ using PhysicalConstants.CODATA2018: c_0 # Speed of light from CODATA2018, with u
 using QuadGK # Numerical integration
 using Plots, Latexify, UnitfulLatexify, LaTeXStrings
 using Measurements # Uncertainly handling
+using Unitful.DefaultSymbols # Dimensions 𝐋,𝐌,𝐓,𝐈,𝚯,𝐉,𝐍 for length, mass, time, current, temperature, luminosity, and amount
 
 # Unitful doesn't export preferunits so we have to reference by package
 Unitful.preferunits(u"Mpc",u"Msun")
+@derived_dimension HubbleParamDim 𝐋/𝐓/𝐋
 
 # Define our cosmological parameters
 Ω0::Real = 0.3
@@ -303,3 +305,50 @@ plot!(
 ```
 
 Compare -> R^2 value, appearance of fit, match with other sources
+
+
+```julia
+using LsqFit
+
+# E(z::Real, Ω0)::Number = sqrt(Ω0*(1+z)^3 + (1-Ω0))
+
+# function dl(z::Vector, p::Vector)::Unitful.Length
+#     Ω0 = p[1]
+#     H0 = p[2]
+#     display(z)
+#     integral, err = quadgk.(zz -> 1/E(zz, Ω0), 0, z, rtol=1e-8)
+#     return c_0/H0 .* (integral ± err) .* (1+z)
+# end
+
+function dp(z::Real, Ω0, H0::HubbleParamDim)::Unitful.Length
+    integral, err = quadgk(zz -> 1/sqrt(Ω0*(1+z)^3 + (1-Ω0)), 0, z, rtol=1e-8)
+    return c_0/H0 * (integral ± err)
+end
+
+function dl_model(z::Vector, p::Vector)::Vector{Unitful.Length}
+    r = dp.(z, p[1], p[2]) .* (1 .+ z)
+    return Measurements.value.(r)
+end
+
+curve_fit(dl_model, data.z, Measurements.value.(data.dl), [0.3, 70.0u"km/s/Mpc"])
+```
+
+
+```julia
+using LsqFit
+
+function dp(z, Ω, H)
+    integral, err = quadgk(zz -> 1/sqrt(Ω*(1+z)^3 + (1-Ω)), 0, z, rtol=1e-8)
+    return ustrip(u"km/s", c_0)/H * (integral ± err)
+end
+
+function dl_model(z, p)
+    r =  dp.(z, p[1], p[2]) .* (1 .+ z)
+    s = Measurements.value.(r)
+    return s
+end
+
+dl_in = ustrip.(u"Mpc", Measurements.value.(data.dl))
+
+curve_fit(dl_model, data.z, dl_in, [0.3, 70])
+```
