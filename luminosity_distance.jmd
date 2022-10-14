@@ -24,11 +24,9 @@ using PhysicalConstants.CODATA2018: c_0 # Speed of light from CODATA2018, with u
 using QuadGK # Numerical integration
 using Plots, Latexify, UnitfulLatexify, LaTeXStrings
 using Measurements # Uncertainly handling
-using Unitful.DefaultSymbols # Dimensions 𝐋,𝐌,𝐓,𝐈,𝚯,𝐉,𝐍 for length, mass, time, current, temperature, luminosity, and amount
 
 # Unitful doesn't export preferunits so we have to reference by package
 Unitful.preferunits(u"Mpc",u"Msun")
-@derived_dimension HubbleParamDim 𝐋/𝐓/𝐋
 
 # Define our cosmological parameters
 Ω0::Real = 0.3
@@ -252,11 +250,6 @@ Lets try a universe without dark energy.
 Ω0::Real = 1
 ΩΛ::Real = 1 - Ω0
 
-function E_integral(z::Real)::Number
-    integral, err = quadgk(zz -> 1/E(zz), 0, z, rtol=1e-8)
-    return integral ± err
-end
-
 G = ustrip(u"km/s", c_0) * E_integral.(data.z) .* (1 .+ data.z)
 
 allz_H0, allz_err = H0LeastSquares(G, data.z, data.dl)
@@ -328,7 +321,47 @@ weights = 1 ./ ustrip.(u"Mpc", Measurements.uncertainty.(data.dl)).^2
 
 fit = curve_fit(dl_model, data.z, dl_in, weights, [0.3, 70])
 fit_err = margin_error(fit)
+fit_std_err = stderror(fit)
 
 display(fit.param)
 display(fit_err)
+display(fit_std_err)
+
+function E_integral(z::Real)::Number
+    integral, err = quadgk(zz -> 1/E(zz), 0, z, rtol=1e-8)
+    return Measurements.value(integral) ± (Measurements.uncertainty(integral) + Measurements.value(err) + Measurements.uncertainty(err))
+end
+
+z = 0:0.05:1.5
+
+Ω0 = fit.param[1] ± fit_err[1]
+ΩΛ = 1 - Ω0
+H0 = (fit.param[2] ± fit_err[2])*1u"km/s/Mpc"
+
+dlz1 =  c_0  * E_integral.(z) .* (1 .+ z)
+dlz = dlz1 / H0
+
+scatter(data.z,
+        data.dl,
+        unitformat=latexify,
+        label="Candles",
+        legend=:topleft,
+        xlabel=L"\mathrm{Redshift}",
+        ylabel="\\mathrm{Luminosity\\ distance}",
+        markersize=3,
+        markeralpha=0.75
+)
+
+plot!(z, Measurements.value.(dlz), linewidth=1, label="Fit")
+
+plot!(
+    z,
+    Measurements.value.(dlz) + Measurements.uncertainty.(dlz),
+    fillrange = Measurements.value.(dlz) - Measurements.uncertainty.(dlz),
+    fillcolor = :lightgray,
+    fillalpha = 0.5,
+    linecolor = nothing,
+    primary = false, # no legend entry
+    z_order = :back
+)
 ```

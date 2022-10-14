@@ -341,3 +341,4 @@ TSWLatexianTemp*
 
 # Weave seems to make these
 jl_*
+LOCAL_APPDATA_FONTCONFIG_CACHE/
