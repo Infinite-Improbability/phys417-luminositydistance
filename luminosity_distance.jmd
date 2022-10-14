@@ -306,36 +306,11 @@ plot!(
 
 Compare -> R^2 value, appearance of fit, match with other sources
 
-
 ```julia
 using LsqFit
 
-# E(z::Real, Ω0)::Number = sqrt(Ω0*(1+z)^3 + (1-Ω0))
-
-# function dl(z::Vector, p::Vector)::Unitful.Length
-#     Ω0 = p[1]
-#     H0 = p[2]
-#     display(z)
-#     integral, err = quadgk.(zz -> 1/E(zz, Ω0), 0, z, rtol=1e-8)
-#     return c_0/H0 .* (integral ± err) .* (1+z)
-# end
-
-function dp(z::Real, Ω0, H0::HubbleParamDim)::Unitful.Length
-    integral, err = quadgk(zz -> 1/sqrt(Ω0*(1+z)^3 + (1-Ω0)), 0, z, rtol=1e-8)
-    return c_0/H0 * (integral ± err)
-end
-
-function dl_model(z::Vector, p::Vector)::Vector{Unitful.Length}
-    r = dp.(z, p[1], p[2]) .* (1 .+ z)
-    return Measurements.value.(r)
-end
-
-curve_fit(dl_model, data.z, Measurements.value.(data.dl), [0.3, 70.0u"km/s/Mpc"])
-```
-
-
-```julia
-using LsqFit
+# Implementing this curve fitting produced a succession of cryptic errors
+# that I resolved by removing uncertainties and units, with some regret.
 
 function dp(z, Ω, H)
     integral, err = quadgk(zz -> 1/sqrt(Ω*(1+z)^3 + (1-Ω)), 0, z, rtol=1e-8)
@@ -349,6 +324,11 @@ function dl_model(z, p)
 end
 
 dl_in = ustrip.(u"Mpc", Measurements.value.(data.dl))
+weights = 1 ./ ustrip.(u"Mpc", Measurements.uncertainty.(data.dl)).^2
 
-curve_fit(dl_model, data.z, dl_in, [0.3, 70])
+fit = curve_fit(dl_model, data.z, dl_in, weights, [0.3, 70])
+fit_err = margin_error(fit)
+
+display(fit.param)
+display(fit_err)
 ```
