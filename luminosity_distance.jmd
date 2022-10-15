@@ -39,7 +39,7 @@ If we assume
 and use ``a_0=1``
 as holds for matter density, in a matter dominated universe or mixture, this transforms into
 ```math
-\frac{H^2}{H_0^2} = \frac{Ω_0}{a^3} + \frac{Ω_{k,0}}{a^2} + Ω_{Λ_0}
+\frac{H^2}{H_0^2} = \frac{Ω_0}{a^3} + \frac{Ω_{k,0}}{a^2} + Ω_{Λ,0}
 ```
 Then it is just a matter of using
 ```math
@@ -47,16 +47,61 @@ a = \frac{1}{1+z}
 ```
 to find
 ```math
-\frac{H^2}{H_0^2} = Ω_0(1+z)^3 + Ω_{k,0}(1+z)^2 + Ω_{Λ_0}
+\frac{H^2}{H_0^2} = Ω_0(1+z)^3 + Ω_{k,0}(1+z)^2 + Ω_{Λ,0}
 ```
 or
 ```math
-H = H_0 \sqrt{Ω_0(1+z)^3 + Ω_{k,0}(1+z)^2 + Ω_{Λ_0}}
+H = H_0 \sqrt{Ω_0(1+z)^3 + Ω_{k,0}(1+z)^2 + Ω_{Λ,0}}
+```
+# Luminosity Distance Behaviour
+Luminosity distance is given by
+```math
+d_L = d_p (1 + z)
+```
+where the physical (comoving) distance is given by
+```math
+d_p = \frac{c}{H_0} \int_0^z \frac{dz'}{E(z')}
 ```
 
+In a universe dominated by dark energy
+```math
+Ω_{Λ,0} = 1
+```
+```math
+E(z) = \sqrt{Ω_{Λ,0}} = 1
+```
+```math
+d_p = \frac{cz}{H_0}
+```
+Then luminosity distance is simply
+```math
+d_L = \frac{cz}{H_0}(1+z)
+```
+For large redshifts we get
+```math
+d_L ∝ z^2
+```
 
-Predict behaviour (take limits)
+In a universe dominated by matter
+```math
+Ω_0 = 1
+```
+```math
+E(z) = (1+z)^{3/2}
+```
+```math
+d_p = \frac{2c}{H_0} \left(1 - \frac{1}{\sqrt{1+z}} \right) 
+```
+Then luminosity distance is
+```math
+d_L = \frac{2c}{H_0} \left(1 + z - \sqrt{1+z} \right)
+```
+For large redshifts we get
+```math
+d_L ∝ z
+```
 
+# Luminosity Distance Plots
 In a universe with both matter and dark energy we need to find ``d_p`` by numerical integration of
 ```math
 d_p(z) = \frac{c}{H_0} \int_0^z \frac{dz'}{E(z')}
