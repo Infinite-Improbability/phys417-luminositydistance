@@ -53,7 +53,7 @@ or
 ```math
 H = H_0 \sqrt{Ω_0(1+z)^3 + Ω_{k,0}(1+z)^2 + Ω_{Λ,0}}
 ```
-# Luminosity Distance Behaviour
+## Luminosity Distance Behaviour
 Luminosity distance is given by
 ```math
 d_L = d_p (1 + z)
@@ -101,7 +101,7 @@ For large redshifts we get
 d_L ∝ z
 ```
 
-# Luminosity Distance Plots
+## Luminosity Distance Plots
 In a universe with both matter and dark energy we need to find ``d_p`` by numerical integration of
 ```math
 d_p(z) = \frac{c}{H_0} \int_0^z \frac{dz'}{E(z')}
@@ -151,16 +151,19 @@ plot(z,
 # Matter dominated -> no dark energy
 Ω0::Real = 1
 ΩΛ::Real = 1 - Ω0
-plot!(z, dl.(z), label="\\Omega_0=$(Ω0)") # plot!() updates last plot
+plot!(z, 2 * c_0 / H0 * (1 .+ z - sqrt.(1 .+ z)), label="\\Omega_0=$(Ω0)") # plot!() updates last plot
+# Testing using the numerical solution agrees with the exact solution, but I've
+# left it off the final plot since you can't see both lines at once.
+# plot!(z, dl.(z), label="\\Omega_0=$(Ω0)") 
 
 # Dark energy dominated -> no matter
 Ω0::Real = 0
 ΩΛ::Real = 1 - Ω0
-plot!(z, dl.(z), label="\\Omega_0=$(Ω0)")
+plot!(z, c_0 / H0 * z .* (1 .+ z), label="\\Omega_0=$(Ω0)")
+# plot!(z, dl.(z), label="\\Omega_0=$(Ω0)")
 ```
 
-Candle time.
-
+# Candles
 We know that radial velocity is related to proper distance by
 ```math
 v_r = H_0 d_p
