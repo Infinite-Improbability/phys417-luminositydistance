@@ -9,7 +9,52 @@ using Dates
 ```
 
 # The Friedmann Equation
-Show it can be written
+
+The Hubble parameter is given by
+```math
+H(t)^2 = \frac{8πG}{3}ρ - \frac{k}{a^2} + \frac{Λ}{3}
+```
+We can define
+```math
+ρ_c = \frac{3H(t)^2}{8πG}
+```
+```math
+Ω = \frac{ρ}{ρ_c} = \frac{8πG}{3H(t)^2}ρ
+```
+```math
+Ω_k = -\frac{k}{H(t)^2a^2}
+```
+```math
+Ω_Λ = \frac{Λ}{3H(t)^2}
+```
+as seen in Lecture 2. We see we can rewrite our first equation as
+```math
+\frac{H^2}{H_0^2} = \frac{8πG}{3H_0^2}ρ - \frac{k}{H_0^2 a^2} + \frac{Λ}{H_0^2}
+```
+where we have dropped the ``t`` in our notation for ``H(t)`` and used a subscript zero to indicate quantities at the present time
+If we assume
+```math
+ρ = \frac{ρ_0}{a^3}
+```
+and use ``a_0=1``
+as holds for matter density, in a matter dominated universe or mixture, this transforms into
+```math
+\frac{H^2}{H_0^2} = \frac{Ω_0}{a^3} + \frac{Ω_{k,0}}{a^2} + Ω_{Λ_0}
+```
+Then it is just a matter of using
+```math
+a = \frac{1}{1+z}
+```
+to find
+```math
+\frac{H^2}{H_0^2} = Ω_0(1+z)^3 + Ω_{k,0}(1+z)^2 + Ω_{Λ_0}
+```
+or
+```math
+H = H_0 \sqrt{Ω_0(1+z)^3 + Ω_{k,0}(1+z)^2 + Ω_{Λ_0}}
+```
+
+
 Predict behaviour (take limits)
 
 In a universe with both matter and dark energy we need to find ``d_p`` by numerical integration of
@@ -119,7 +164,7 @@ scatter(data.z,
 )
 ```
 
-We can perform basic least squares in Julia with remarkable ease. Remarkably it handles uncertaintities.
+We can perform basic least squares in Julia with remarkable ease. Remarkably it carries the uncertaintities.
 However it doesn't like units so we'll have to strip them (carefully!). The line of best fit is underlaid by
 a light orange region showing variation from the uncertainty in ``H_0`` and a grey region showing the
 standard deviation of the data as estimated from the fitting. The first region is very narrow and thus
@@ -322,9 +367,16 @@ fit = curve_fit(dl_model, data.z, dl_in, weights, [0.3, 70])
 fit_err = margin_error(fit)
 fit_std_err = stderror(fit)
 
+# sum of squares error
+fit_err2 = Measurements.value(sum(abs2, data.dl - dl_model(data.z, [Ω0, ustrip(H0)])*1u"Mpc"))
+var = Measurements.value.(sum(abs2, data.dl .- mean(data.dl)))
+println("R^2 = $(1 - fit_err2/var)") # Coefficent of determination
+dl_fit_err = sqrt(1/(length(data.z)-1) * fit_err2) # Std of dl from fit error
+
 display(fit.param)
 display(fit_err)
 display(fit_std_err)
+display(dl_fit_err)
 
 function E_integral(z::Real)::Number
     integral, err = quadgk(zz -> 1/E(zz), 0, z, rtol=1e-8)
@@ -356,6 +408,17 @@ plot!(z, Measurements.value.(dlz), linewidth=1, label="Fit")
 
 plot!(
     z,
+    Measurements.value.(dlz) .+ dl_fit_err,
+    fillrange = Measurements.value.(dlz) .- dl_fit_err,
+    fillcolor = :lightgray,
+    fillalpha = 0.5,
+    linecolor = nothing,
+    primary = false, # no legend entry
+    z_order = :back
+)
+
+plot!(
+    z,
     Measurements.value.(dlz) + Measurements.uncertainty.(dlz),
     fillrange = Measurements.value.(dlz) - Measurements.uncertainty.(dlz),
     fillcolor = :orange,
@@ -365,19 +428,5 @@ plot!(
     z_order = :back
 )
 
-# sum of squares error
-fit_err = Measurements.value(sum(abs2, data.dl - dl_model(data.z, [Ω0, ustrip(H0)])*1u"Mpc"))
-dl_fit_err = sqrt(1/(length(data.z)-1) * fit_err) # Std of dl from fit error
-
-plot!(
-    z,
-    Measurements.value.(dlz) .+ dl_fit_err,
-    fillrange = Measurements.value.(dlz) .- dl_fit_err,
-    fillcolor = :lightgray,
-    fillalpha = 0.5,
-    linecolor = nothing,
-    primary = false, # no legend entry
-    z_order = :back
-)
 
 ```
