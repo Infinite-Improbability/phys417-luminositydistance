@@ -312,8 +312,7 @@ end
 
 function dl_model(z, p)
     r =  dp.(z, p[1], p[2]) .* (1 .+ z)
-    s = Measurements.value.(r)
-    return s
+    return Measurements.value.(r)
 end
 
 dl_in = ustrip.(u"Mpc", Measurements.value.(data.dl))
@@ -329,7 +328,8 @@ display(fit_std_err)
 
 function E_integral(z::Real)::Number
     integral, err = quadgk(zz -> 1/E(zz), 0, z, rtol=1e-8)
-    return Measurements.value(integral) ± (Measurements.uncertainty(integral) + Measurements.value(err) + Measurements.uncertainty(err))
+    err = Measurements.value(Measurements.uncertainty(integral) + Measurements.value(err) + Measurements.uncertainty(err))
+    return Measurements.value(integral) ± err
 end
 
 z = 0:0.05:1.5
@@ -358,10 +358,26 @@ plot!(
     z,
     Measurements.value.(dlz) + Measurements.uncertainty.(dlz),
     fillrange = Measurements.value.(dlz) - Measurements.uncertainty.(dlz),
+    fillcolor = :orange,
+    fillalpha = 0.75,
+    linecolor = nothing,
+    primary = false, # no legend entry
+    z_order = :back
+)
+
+# sum of squares error
+fit_err = Measurements.value(sum(abs2, data.dl - dl_model(data.z, [Ω0, ustrip(H0)])*1u"Mpc"))
+dl_fit_err = sqrt(1/(length(data.z)-1) * fit_err) # Std of dl from fit error
+
+plot!(
+    z,
+    Measurements.value.(dlz) .+ dl_fit_err,
+    fillrange = Measurements.value.(dlz) .- dl_fit_err,
     fillcolor = :lightgray,
     fillalpha = 0.5,
     linecolor = nothing,
     primary = false, # no legend entry
     z_order = :back
 )
+
 ```
