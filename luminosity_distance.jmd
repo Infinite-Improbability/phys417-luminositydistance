@@ -304,16 +304,17 @@ dl_in = ustrip.(u"Mpc", Measurements.value.(data.dl))
 weights = 1 ./ ustrip.(u"Mpc", Measurements.uncertainty.(data.dl)).^2
 
 fit = curve_fit(dl_model, data.z, dl_in, weights, [0.3, 70])
-fit_err = margin_error(fit)
 
+fit_err = stderror(fit) .* fit.param
 # sum of squares error
 fit_err2 = Measurements.value(sum(abs2, data.dl - dl_model(data.z, [Ω0, ustrip(H0)])*1u"Mpc"))
 var = Measurements.value.(sum(abs2, data.dl .- mean(data.dl)))
 println("R^2 = $(1 - fit_err2/var)") # Coefficent of determination
 dl_fit_err = sqrt(1/(length(data.z)-1) * fit_err2) # Std of dl from fit error
 
-display(fit.param)
-display(dl_fit_err)
+params = fit.param .± fit_err
+println("Ω0 = $(params[1])")
+println("H0 = $(params[2])")
 
 function E_integral(z::Real)::Number
     integral, err = quadgk(zz -> 1/E(zz), 0, z, rtol=1e-8)
@@ -327,8 +328,7 @@ z = 0:0.05:1.5
 ΩΛ = 1 - Ω0
 H0 = (fit.param[2] ± fit_err[2])*1u"km/s/Mpc"
 
-dlz1 =  c_0  * E_integral.(z) .* (1 .+ z)
-dlz = dlz1 / H0
+dlz = c_0 / H0 * E_integral.(z) .* (1 .+ z) 
 
 scatter(data.z,
         data.dl,
@@ -348,7 +348,7 @@ plot!(
     Measurements.value.(dlz) .+ dl_fit_err,
     fillrange = Measurements.value.(dlz) .- dl_fit_err,
     fillcolor = :lightgray,
-    fillalpha = 0.5,
+    fillalpha = 0.75,
     linecolor = nothing,
     primary = false, # no legend entry
     z_order = :back
@@ -364,6 +364,5 @@ plot!(
     primary = false, # no legend entry
     z_order = :back
 )
-
-
 ```
+This result is unconvincing.
