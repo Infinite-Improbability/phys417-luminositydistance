@@ -220,31 +220,23 @@ hard to see.
 ```julia
 using Statistics: mean
 
-function H0LeastSquares(kernel, z_data, dl_data)
-    """Peform linear least squares in one variable.
-    Returns estimated parameter and estimated standard deviation of data w.r.t the fit."""
-    reciprocal_H0 = kernel \ ustrip.(u"Mpc", dl_data) # This performs least squares
-    est_H0 = 1u"km/s/Mpc" / reciprocal_H0
-
-    println("Estimated H0 = $(est_H0)")
-
-    dl_mean = mean(dl_data)
-    # sum of squares error
-    fit_err = sum(abs2, Measurements.value.(dl_data) - z_data*c_0/Measurements.value(est_H0))
-    # sum of variance
-    var = sum(abs2, Measurements.value.(dl_data .- Measurements.value.(dl_mean))) 
-    # Coefficent of determination
-    println("R^2 = $(1 - fit_err/var)") 
-    # Std of dl from fit error
-    dl_fit_err = sqrt(1/(length(z_data)-1) * fit_err) 
-
-    return est_H0, dl_fit_err
-end
-
 lowz_data = @view data[data.z .< 0.1, [:z, :dl]] # get z and DM for low redshift
-G = lowz_data.z * ustrip(u"km/s", c_0) # construct kernel. dl = G*(1/H0)
+kernel = lowz_data.z * ustrip(u"km/s", c_0) # construct kernel. dl = G*(1/H0)
 
-lowz_H0, lowz_err = H0LeastSquares(G, lowz_data.z, lowz_data.dl) # do the least squares
+reciprocal_H0 = kernel \ ustrip.(u"Mpc", lowz_data.dl) # This performs least squares
+
+lowz_H0 = 1u"km/s/Mpc" / reciprocal_H0
+println("Estimated H0 = $(lowz_H0)")
+
+dl_mean = mean(lowz_data.dl)
+# sum of squares error
+fit_err = sum(abs2, Measurements.value.(lowz_data.dl) - lowz_data.z*c_0/Measurements.value(lowz_H0))
+# sum of variance
+var = sum(abs2, Measurements.value.(lowz_data.dl .- Measurements.value.(dl_mean))) 
+# Coefficent of determination
+println("R^2 = $(1 - fit_err/var)") 
+# Std of dl from fit error
+lowz_err = sqrt(1/(length(lowz_data.z)-1) * fit_err) 
 
 # plot data
 scatter(lowz_data.z,
@@ -281,115 +273,6 @@ plot!(
     z,
     z*c_0/(Measurements.value(lowz_H0)-Measurements.uncertainty(lowz_H0)),
     fillrange = z*c_0/(Measurements.value(lowz_H0)+Measurements.uncertainty(lowz_H0)),
-    fillcolor = :orange,
-    fillalpha = 0.75,
-    linecolor = nothing,
-    primary = false, # no legend entry
-    z_order = :back
-)
-```
-
-Now we'll fit the full data, using the full equation for luminosity distance and assuming ``Ω_0=0.3``.
-```julia
-Ω0::Real = 0.3
-ΩΛ::Real = 1 - Ω0
-
-function E_integral(z::Real)::Number
-    integral, err = quadgk(zz -> 1/E(zz), 0, z, rtol=1e-8)
-    return integral ± err
-end
-
-G = ustrip(u"km/s", c_0) * E_integral.(data.z) .* (1 .+ data.z)
-
-allz_H0, allz_err = H0LeastSquares(G, data.z, data.dl)
-
-# I should probably put all this repeated code into a function
-# But I'm not going to
-
-scatter(data.z,
-        data.dl,
-        unitformat=latexify,
-        label="Candles",
-        legend=:topleft,
-        xlabel=L"\mathrm{Redshift}",
-        ylabel="\\mathrm{Luminosity\\ distance}",
-        markersize=3,
-        markeralpha=0.75
-)
-
-z = 0:0.05:1.5
-dlz1 = c_0  * Measurements.value.(E_integral.(z) .* (1 .+ z))
-dlz = dlz1 / Measurements.value(allz_H0)
-
-plot!(z, dlz, linewidth=1, label="Fit")
-
-plot!(
-    z,
-    dlz .+ allz_err,
-    fillrange = dlz .- allz_err,
-    fillcolor = :lightgray,
-    fillalpha = 0.5,
-    linecolor = nothing,
-    primary = false, # no legend entry
-    z_order = :back
-)
-
-plot!(
-    z,
-    dlz1/(Measurements.value(allz_H0)-Measurements.uncertainty(allz_H0)),
-    fillrange = dlz1/(Measurements.value(allz_H0)+Measurements.uncertainty(allz_H0)),
-    fillcolor = :orange,
-    fillalpha = 0.75,
-    linecolor = nothing,
-    primary = false, # no legend entry
-    z_order = :back
-)
-```
-
-Lets try a universe without dark energy.
-```julia
-Ω0::Real = 1
-ΩΛ::Real = 1 - Ω0
-
-G = ustrip(u"km/s", c_0) * E_integral.(data.z) .* (1 .+ data.z)
-
-allz_H0, allz_err = H0LeastSquares(G, data.z, data.dl)
-
-# I should probably put all this repeated code into a function
-# But I'm not going to
-
-scatter(data.z,
-        data.dl,
-        unitformat=latexify,
-        label="Candles",
-        legend=:topleft,
-        xlabel=L"\mathrm{Redshift}",
-        ylabel="\\mathrm{Luminosity\\ distance}",
-        markersize=3,
-        markeralpha=0.75
-)
-
-z = 0:0.05:1.5
-dlz1 = c_0  * Measurements.value.(E_integral.(z) .* (1 .+ z))
-dlz = dlz1 / Measurements.value(allz_H0)
-
-plot!(z, dlz, linewidth=1, label="Fit")
-
-plot!(
-    z,
-    dlz .+ allz_err,
-    fillrange = dlz .- allz_err,
-    fillcolor = :lightgray,
-    fillalpha = 0.5,
-    linecolor = nothing,
-    primary = false, # no legend entry
-    z_order = :back
-)
-
-plot!(
-    z,
-    dlz1/(Measurements.value(allz_H0)-Measurements.uncertainty(allz_H0)),
-    fillrange = dlz1/(Measurements.value(allz_H0)+Measurements.uncertainty(allz_H0)),
     fillcolor = :orange,
     fillalpha = 0.75,
     linecolor = nothing,
