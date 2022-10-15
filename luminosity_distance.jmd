@@ -212,27 +212,31 @@ scatter(data.z,
 )
 ```
 
-We can perform basic least squares in Julia with remarkable ease. Remarkably it carries the uncertaintities.
+We can perform basic least squares in Julia with remarkable ease. Remarkably it progagates the uncertaintities right through.
 However it doesn't like units so we'll have to strip them (carefully!). The line of best fit is underlaid by
-a light orange region showing variation from the uncertainty in ``H_0`` and a grey region showing the
+a light orange region showing variation from the propagated uncertainty in ``H_0`` and a grey region showing the
 standard deviation of the data as estimated from the fitting. The first region is very narrow and thus
 hard to see.
 ```julia
 using Statistics: mean
 
 function H0LeastSquares(kernel, z_data, dl_data)
+    """Peform linear least squares in one variable.
+    Returns estimated parameter and estimated standard deviation of data w.r.t the fit."""
     reciprocal_H0 = kernel \ ustrip.(u"Mpc", dl_data) # This performs least squares
     est_H0 = 1u"km/s/Mpc" / reciprocal_H0
 
     println("Estimated H0 = $(est_H0)")
 
+    dl_mean = mean(dl_data)
     # sum of squares error
     fit_err = sum(abs2, Measurements.value.(dl_data) - z_data*c_0/Measurements.value(est_H0))
-    dl_mean = mean(dl_data)
     # sum of variance
     var = sum(abs2, Measurements.value.(dl_data .- Measurements.value.(dl_mean))) 
-    println("R^2 = $(1 - fit_err/var)") # Coefficent of determination
-    dl_fit_err = sqrt(1/(length(z_data)-1) * fit_err) # Std of dl from fit error
+    # Coefficent of determination
+    println("R^2 = $(1 - fit_err/var)") 
+    # Std of dl from fit error
+    dl_fit_err = sqrt(1/(length(z_data)-1) * fit_err) 
 
     return est_H0, dl_fit_err
 end
@@ -240,8 +244,9 @@ end
 lowz_data = @view data[data.z .< 0.1, [:z, :dl]] # get z and DM for low redshift
 G = lowz_data.z * ustrip(u"km/s", c_0) # construct kernel. dl = G*(1/H0)
 
-lowz_H0, lowz_err = H0LeastSquares(G, lowz_data.z, lowz_data.dl)
+lowz_H0, lowz_err = H0LeastSquares(G, lowz_data.z, lowz_data.dl) # do the least squares
 
+# plot data
 scatter(lowz_data.z,
         lowz_data.dl,
         unitformat=latexify,
@@ -256,8 +261,10 @@ scatter(lowz_data.z,
 z = 0:0.01:0.1
 dlz = z*c_0/Measurements.value(lowz_H0)
 
+# plot fitted line
 plot!(z, dlz, linewidth=1, label="Fit")
 
+# plot area around fitted line equal to ± standard deviation
 plot!(
     z,
     dlz .+ lowz_err,
@@ -269,6 +276,7 @@ plot!(
     z_order = :back
 )
 
+# plot area around fitted line equal to minimum and maximum from uncertainities
 plot!(
     z,
     z*c_0/(Measurements.value(lowz_H0)-Measurements.uncertainty(lowz_H0)),
