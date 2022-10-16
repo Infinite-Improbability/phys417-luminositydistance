@@ -163,6 +163,8 @@ plot!(z, c_0 / H0 * z .* (1 .+ z), label="\\Omega_0=$(Ω0)")
 # plot!(z, dl.(z), label="\\Omega_0=$(Ω0)")
 ```
 
+In our dark energy dominated universe the rate of expansion is approximately constant. In our matter domianted universe the rate of expansion is approximately proportional to ``z^{3/2}``. This means the mass density was the primary driver of the expansion of the universe in the early days but as space expanded it fell and so the effect lessened. The cosmological constant remains constant regardless of redshift and so can dominate in the present if ``Ω_Λ > Ω_0``.
+
 # Candles
 We know that radial velocity is related to proper distance by
 ```math
@@ -316,6 +318,7 @@ dl_fit_err = sqrt(1/(length(data.z)-1) * fit_err2) # Std of dl from fit error
 params = fit.param .± fit_err
 println("Ω0 = $(params[1])")
 println("H0 = $(params[2])")
+println("Sum of squares error: $(fit_err2)")
 
 function E_integral(z::Real)::Number
     integral, err = quadgk(zz -> 1/E(zz), 0, z, rtol=1e-8)
@@ -365,9 +368,10 @@ plot!(
     primary = false, # no legend entry
     z_order = :back
 )
-```
-This result is unconvincing.
 
+fe3 = fit_err2
+```
+This result is unconvincing. We'll also fit to the case with no dark energy, where ``Ω_0 = 1``.
 ```julia
 using LsqFit
 function dp(z, Ω, H)
@@ -387,13 +391,15 @@ fit = curve_fit(dl_model, data.z, dl_in, weights, [70.0])
 
 fit_err = stderror(fit)
 # sum of squares error
-fit_err2 = Measurements.value(sum(abs2, data.dl - dl_model(data.z, [Ω0, ustrip(H0)])*1u"Mpc"))
+fit_err2 = Measurements.value(sum(abs2, data.dl - dl_model(data.z, fit.param)*1u"Mpc"))
 var = Measurements.value.(sum(abs2, data.dl .- mean(data.dl)))
 println("R^2 = $(1 - fit_err2/var)") # Coefficent of determination
 dl_fit_err = sqrt(1/(length(data.z)-1) * fit_err2) # Std of dl from fit error
 
 params2 = fit.param .± fit_err
 println("H0 = $(params2[1])")
+
+println("Sum of squares error: $(fit_err2)")
 
 function E_integral(z::Real)::Number
     integral, err = quadgk(zz -> 1/E(zz), 0, z, rtol=1e-8)
@@ -409,7 +415,7 @@ H0 = (params2[1])*1u"km/s/Mpc"
 
 dlz = c_0 / H0 * E_integral.(z) .* (1 .+ z) 
 
-plot!(z, Measurements.value.(dlz), linewidth=1, label="\\Omega_0 = 1")
+plot!(z, Measurements.value.(dlz), linewidth=1, label="\\Omega_0 = $(Ω0)")
 
 plot!(
     z,
@@ -421,7 +427,17 @@ plot!(
     primary = false, # no legend entry
     z_order = :back
 )
+
+Ω0 = 0.3
+ΩΛ = 1 - Ω0
+H0 = 70u"km/s/Mpc"
+
+ss_err = sum(abs2, data.dl - dl.(data.z))
+println("Sum of squares error (Ω0 = $(Ω0)): $(ss_err)")
+
+plot!(z, Measurements.value.(dl.(z)), linewidth=1, label="\\Omega_0 = $(Ω0)")
 ```
+To the eye this does a good job of fitting the low redshift data but somewhat understimates the upper end. From the ``R^2`` values I'd judge it a worse fit than the universe with dark energy, but I wouldn't say the dark energy fit is particularly good either. From comparing the sum of squares error we actually see that the ``Ω_0 = 0.3`` line, manually inserted by me, performs better than either fitted line, or at least it better satisifies the very condition least squares is optimising for. It would appear that the curve fitting is not very successful.
 
 ## Angular Diameter Distance
 
@@ -432,7 +448,7 @@ function da(z, p)::Vector{<:Unitful.Length}
 end
 
 z = 0:0.01:10
-daz = da(z, params)
+daz = da(z, params) # params is [Ω0 H0]
 
 plot(z, Measurements.value.(daz), xlabel="Redshift", ylabel="Angular diameter distance", legend=false)
 
