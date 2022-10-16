@@ -327,7 +327,7 @@ z = 0:0.05:1.5
 
 Ω0 = params[1]
 ΩΛ = 1 - Ω0
-H0 = params[1]*1u"km/s/Mpc"
+H0 = params[2]*1u"km/s/Mpc"
 
 dlz = c_0 / H0 * E_integral.(z) .* (1 .+ z) 
 
@@ -431,18 +431,34 @@ function da(z, p)::Vector{<:Unitful.Length}
     return Measurements.value.(r)
 end
 
-z = 0:0.1:10
+z = 0:0.01:10
+daz = da(z, params)
 
-plot(z, da(z, params), xlabel="Redshift", ylabel="Angular diameter distance", legend=false)
+plot(z, Measurements.value.(daz), xlabel="Redshift", ylabel="Angular diameter distance", legend=false)
+
+plot!(
+    z,
+    Measurements.value.(daz) + Measurements.uncertainty.(daz),
+    fillrange = Measurements.value.(daz) - Measurements.uncertainty.(daz),
+    fillcolor = :lightgray,
+    fillalpha = 0.75,
+    linecolor = nothing,
+    primary = false, # no legend entry
+    z_order = :back
+)
 ```
 
-To calculate the minimum expected angular size, using only galaxies in our dataset, we can use
+The smallest angular size in our dataset is
 ```julia
 # If I use uconvert then the arcsecond symbol breaks the silly Julia -> latex converter I've
 # been trying in this report. This still converts, but then strips the units.
 ustrip(u"arcsecond", minimum(30u"kpc" ./ (data.dl ./ (1 .+ data.z).^2)) * 1u"rad")
 ```
-The theoretical minimum
+The theoretical minimum using our calculated parameters
 ```julia
-ustrip(u"arcsecond", minimum(30u"kpc" ./ (data.dl ./ (1 .+ data.z).^2)) * 1u"rad")
+# I could probably solve this analytically but this is faster and easier
+ustrip(u"arcsecond", minimum(30u"kpc" ./ daz) * 1u"rad")
 ```
+I believe the discrepency is because there is a supernova at z=0.55 that is significantly above the  and thus throwing our results off.
+
+Actually observing the theoretically minimum is unlikely because in sufficently high redshift observations galaxies are usually too young to have supernovae.
